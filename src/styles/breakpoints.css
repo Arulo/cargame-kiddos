@@ -1,0 +1,69 @@
+/* =====================================================================
+   BREAKPOINTS — el juego siempre corre en horizontal, así que se mide
+   por ALTO de pantalla (en px CSS):
+
+     phone      alto < 500px     iPhone / Android en horizontal (~320–430)
+     tablet     500 – 899px      iPad, iPad mini, iPad Air (~744–834)
+     tablet-xl  alto >= 900px    iPad Pro 12.9" (~1024), compu grande
+
+   Todos los tamaños de la interfaz salen de estas variables. Para ajustar
+   algo en un tamaño concreto, cambiá sólo el bloque de ese breakpoint.
+   (Con ?debug=1 en la URL se muestra el breakpoint activo abajo a la izquierda.)
+   El dibujo pixel (coche, fondos) se escala aparte, siempre en múltiplos
+   enteros, así que no depende de estas variables.
+   ===================================================================== */
+
+:root {
+  /* phone (base, mobile-first) */
+  --font: 15px;
+  --gap: 6px;
+  --radius: 6px;
+  --btn: 40px;          /* alto de botones de la barra superior */
+  --tab: 46px;          /* pestañas del taller */
+  --thumb: 74px;        /* miniaturas de piezas */
+  --swatch: 26px;       /* muestras de color */
+  --panel-w: 46%;       /* ancho del panel de piezas */
+  --pedal-w: 108px;     /* pedales (acelerar / frenar) */
+  --pedal-h: 84px;
+  --round: 58px;        /* bocina y luces */
+  --prompt: 17px;       /* texto de los avisos al manejar */
+  --tab-label: none;    /* en celular las pestañas sólo muestran el ícono */
+  --card: 190px;        /* tarjetas de garaje / fondos */
+}
+
+@media (min-height: 500px) {
+  /* tablet */
+  :root {
+    --font: 18px;
+    --gap: 10px;
+    --radius: 8px;
+    --btn: 54px;
+    --tab: 66px;
+    --thumb: 98px;
+    --swatch: 36px;
+    --panel-w: 44%;
+    --pedal-w: 150px;
+    --pedal-h: 118px;
+    --round: 84px;
+    --prompt: 24px;
+    --tab-label: block;
+    --card: 260px;
+  }
+}
+
+@media (min-height: 900px) {
+  /* tablet-xl */
+  :root {
+    --font: 22px;
+    --gap: 14px;
+    --btn: 64px;
+    --tab: 78px;
+    --thumb: 120px;
+    --swatch: 44px;
+    --pedal-w: 180px;
+    --pedal-h: 140px;
+    --round: 100px;
+    --prompt: 30px;
+    --card: 320px;
+  }
+}
