@@ -17,7 +17,7 @@ export interface HalfDef {
   bot?(d: number): number;
   /** posición del faro (frente) o la luz trasera (atrás) */
   light: { d: number; y: number };
-  kind?: 'jeep' | 'pickup' | 'furgon';
+  kind?: 'jeep' | 'pickup' | 'furgon' | 'truck' | 'shark' | 'bus' | 'volquete' | 'fin' | 'limo';
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -52,6 +52,22 @@ export const FRONTS: HalfDef[] = [
     bot: (d) => (d >= 39 ? -(d - 38) : 0),
     light: { d: 36, y: -7 },
   },
+  {
+    id: 'camion', name: 'Camión', L: 42, wheel: 28,
+    top: (d) => (d < 20 ? -14 : d === 20 ? -16 : -18),
+    light: { d: 38, y: -13 }, kind: 'truck',
+  },
+  {
+    id: 'tiburon', name: 'Tiburón', L: 52, wheel: 31,
+    top: (d) => (d < 20 ? -14 : Math.round(lerp(-14, -7, (d - 20) / 32))),
+    bot: (d) => (d > 40 ? -Math.round((d - 40) * 0.35) : 0),
+    light: { d: 43, y: -9 }, kind: 'shark',
+  },
+  {
+    id: 'bus', name: 'Autobús', L: 36, wheel: 24,
+    top: () => -14,
+    light: { d: 33, y: -8 }, kind: 'bus',
+  },
 ];
 
 export const REARS: HalfDef[] = [
@@ -83,6 +99,27 @@ export const REARS: HalfDef[] = [
     bot: (d) => (d >= 39 ? -(d - 38) : 0),
     light: { d: 37, y: -7 },
   },
+  {
+    id: 'volquete', name: 'Volquete', L: 52, wheel: 34,
+    top: (d) => (d < 20 ? -14 : d === 20 ? -22 : d === 21 ? -25 : -28),
+    light: { d: 50, y: -8 }, kind: 'volquete',
+  },
+  {
+    id: 'aleta', name: 'Aleta', L: 46, wheel: 30,
+    top: (d) => {
+      const body = d < 20 ? -14 : Math.round(lerp(-14, -11, (d - 20) / 26));
+      const fin = d >= 30 ? Math.round(-11 - (d - 30) * 1.15) : 0;
+      return Math.min(body, fin);
+    },
+    bot: (d) => (d >= 44 ? -(d - 43) : 0),
+    light: { d: 43, y: -16 }, kind: 'fin',
+  },
+  {
+    id: 'limusina', name: 'Larga', L: 62, wheel: 48,
+    top: (d) => (d < 56 ? -14 : -14 + (d - 55)),
+    bot: (d) => (d >= 60 ? -(d - 59) : 0),
+    light: { d: 58, y: -8 }, kind: 'limo',
+  },
 ];
 
 export interface CabinDef {
@@ -97,7 +134,9 @@ export interface CabinDef {
   headX: number;
   antenna?: [number, number];
   roof?: [number, number];
-  special?: 'convertible';
+  special?: 'convertible' | 'casco';
+  /** marco del vidrio más fino (cúpula) */
+  thinFrame?: boolean;
   horn: number;
 }
 
@@ -132,6 +171,21 @@ export const CABINS: CabinDef[] = [
     pts: [[-20, -32], [8, -32], [15, -15], [18, -14]],
     windows: [[-16, -2], [1, 12]], headX: 5, horn: 220,
   },
+  {
+    id: 'cupula', name: 'Cúpula', x0: -16, x1: 14,
+    topFn: (x) => -14 - Math.round(17 * Math.sqrt(Math.max(0, 1 - ((x + 1) / 15.5) ** 2))),
+    windows: [[-14, 12]], headX: 2, thinFrame: true, antenna: [-9, -28], horn: 700,
+  },
+  {
+    id: 'furgo', name: 'Furgoneta', x0: -20, x1: 18,
+    pts: [[-20, -30], [-19, -31], [11, -31], [18, -16], [18, -14]],
+    windows: [[-17, -10], [-7, 1], [4, 14]], headX: 8, horn: 380,
+  },
+  {
+    id: 'carrera', name: 'Carreras', x0: -20, x1: 16,
+    pts: [[-20, -17], [16, -17]],
+    windows: [], headX: 1, special: 'casco', antenna: [-18, -18], roof: [-12, -18], horn: 660,
+  },
 ];
 
 export function cabinTop(c: CabinDef, x: number): number {
@@ -150,7 +204,7 @@ export interface WheelDef {
   name: string;
   r: number;
   tire: 'liso' | 'tacos' | 'banda';
-  rim: 'tapa' | 'rayos' | 'radios' | 'estrella' | 'plato';
+  rim: 'tapa' | 'rayos' | 'radios' | 'estrella' | 'plato' | 'espiral' | 'agujeros';
   rimK: number;
 }
 
@@ -162,6 +216,9 @@ export const WHEELS: WheelDef[] = [
   { id: 'estrella', name: 'Estrella', r: 10, tire: 'liso', rim: 'estrella', rimK: 0.66 },
   { id: 'todoterreno', name: 'Todoterreno', r: 12, tire: 'tacos', rim: 'plato', rimK: 0.55 },
   { id: 'monstruo', name: 'Monstruo', r: 16, tire: 'tacos', rim: 'rayos', rimK: 0.55 },
+  { id: 'espiral', name: 'Espiral', r: 10, tire: 'liso', rim: 'espiral', rimK: 0.72 },
+  { id: 'agujeros', name: 'Carreras', r: 9, tire: 'liso', rim: 'agujeros', rimK: 0.72 },
+  { id: 'tractor', name: 'Tractor', r: 14, tire: 'tacos', rim: 'agujeros', rimK: 0.5 },
 ];
 
 export interface SimpleDef {
@@ -175,6 +232,9 @@ export const LIGHTS: SimpleDef[] = [
   { id: 'doble', name: 'Dobles' },
   { id: 'ojitos', name: 'Ojitos' },
   { id: 'rayo', name: 'Rasgados' },
+  { id: 'enojados', name: 'Enojados' },
+  { id: 'estrella', name: 'Estrella' },
+  { id: 'corazon', name: 'Corazón' },
 ];
 
 export const ANTENNAS: SimpleDef[] = [
@@ -223,6 +283,8 @@ export interface CarConfig {
   roof: string;
   extras: string[];
   decal: string;
+  /** número de carrera (0-9) para el dibujo "Número" */
+  number?: number;
   colors: {
     front: string;
     rear: string;

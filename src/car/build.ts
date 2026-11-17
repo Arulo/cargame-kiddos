@@ -129,6 +129,35 @@ function wheelFrame(w: WheelDef, ramp: Ramp, angle: number): HTMLCanvasElement {
       pb.poly(pts, ramp.l);
       break;
     }
+    case 'espiral': {
+      rim(rr, '#ffffff');
+      for (let arm = 0; arm < 2; arm++)
+        for (let t = 0; t <= 1; t += 0.02) {
+          const a = angle + arm * Math.PI + t * Math.PI * 3;
+          const rad = t * (rr - 0.4);
+          pb.set(c + Math.cos(a) * rad, c + Math.sin(a) * rad, ramp.b);
+          pb.set(c + Math.cos(a) * rad + 0.6, c + Math.sin(a) * rad, ramp.b);
+        }
+      for (let dy = -rr - 1; dy <= rr + 1; dy++)
+        for (let dx = -rr - 1; dx <= rr + 1; dx++) {
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d > rr - 0.6 && d <= rr + 0.5) pb.set(c + dx, c + dy, ramp.d);
+        }
+      break;
+    }
+    case 'agujeros': {
+      rim(rr, ramp.b);
+      for (let dy = -rr; dy <= rr; dy++)
+        for (let dx = -rr; dx <= rr; dx++)
+          if (dx * dx + dy * dy <= rr * rr && dx + dy < -rr * 0.6) pb.set(c + dx, c + dy, ramp.l);
+      const n = rr >= 6 ? 6 : 4;
+      for (let k = 0; k < n; k++) {
+        const a = angle + (k * Math.PI * 2) / n;
+        const hx = c + Math.cos(a) * rr * 0.58, hy = c + Math.sin(a) * rr * 0.58;
+        pb.disc(hx, hy, rr >= 6 ? 1.1 : 0.6, '#18181f');
+      }
+      break;
+    }
     case 'plato':
       rim(rr, ramp.b);
       for (let dy = -rr; dy <= rr; dy++)
@@ -195,13 +224,53 @@ function drawHalf(def: HalfDef, ramp: Ramp, dir: 1 | -1): PB {
     // ventanita
     for (let d = 23; d < 31; d++) for (let y = -28; y < -22; y++) pb.set(X(d), OY + y, y === -28 ? GLASS.d : GLASS.b);
   }
+  if (def.kind === 'truck') {
+    // parrilla
+    for (let y = -17; y < -3; y++) {
+      pb.set(X(def.L - 1), OY + y, y % 2 ? METAL.l : METAL.d);
+      pb.set(X(def.L - 2), OY + y, y % 2 ? METAL.b : METAL.o);
+    }
+    pb.rect(X(def.L - 3), OY - 3, 4, 3, DARKMETAL.b);
+    for (let d = 22; d < def.L - 3; d += 4) pb.set(X(d), OY - 15, ramp.d);
+  }
+  if (def.kind === 'shark') {
+    // boca con dientes
+    for (let d = 36; d < def.L - 1; d++) {
+      const b = def.bot ? def.bot(d) : 0;
+      pb.set(X(d), OY + b - 4, ramp.o);
+      pb.set(X(d), OY + b - 3, '#ffffff');
+      if (d % 2 === 0) pb.set(X(d), OY + b - 2, '#ffffff');
+      else pb.set(X(d), OY + b - 2, '#8a1020');
+    }
+    // agallas
+    for (const d of [25, 28, 31]) for (let y = -11; y < -6; y++) pb.set(X(d), OY + y, ramp.d);
+  }
+  if (def.kind === 'bus') {
+    pb.rect(X(def.L - 1), OY - 2, 2, 2, DARKMETAL.b);
+    for (let d = 2; d < def.L - 2; d += 6) pb.set(X(d), OY - 10, ramp.l);
+  }
+  if (def.kind === 'volquete') {
+    for (let d = 20; d < def.L; d++) pb.set(X(d), OY - 13, ramp.o);
+    for (let d = 26; d < def.L - 2; d += 7) for (let y = -27; y < -13; y++) pb.set(X(d), OY + y, ramp.d);
+    for (let d = 21; d < def.L; d++) pb.set(X(d), OY - 26, ramp.l);
+    pb.rect(X(def.L - 1) - (dir === 1 ? 0 : 1), OY - 12, 2, 12, DARKMETAL.b);
+  }
+  if (def.kind === 'fin') {
+    for (let d = 31; d < def.L - 1; d++) pb.set(X(d), OY + def.top(d) + 2, ramp.l);
+  }
+  if (def.kind === 'limo') {
+    // puerta trasera extra con manija (sin ventanas)
+    for (let y = -12; y < -2; y++) pb.set(X(34), OY + y, ramp.d);
+    pb.rect(X(31) - 1, OY - 10, 3, 1, METAL.l);
+    pb.rect(X(31) - 1, OY - 9, 3, 1, METAL.d);
+  }
   if (def.kind === 'jeep') {
     for (let y = -11; y < -3; y += 2) pb.set(X(def.L - 1), OY + y, ramp.o);
   }
   return pb;
 }
 
-function cutWell(pb: PB, cx: number, r: number, ramp: Ramp) {
+function cutWell(pb: PB, cx: number, r: number, ramp: Ramp, mark?: Set<number>) {
   const axle = r - 9;
   const R = r + 1.5;
   for (let y = -16; y < 0; y++)
@@ -210,6 +279,8 @@ function cutWell(pb: PB, cx: number, r: number, ramp: Ramp) {
       const d = Math.hypot(x - cx, y - axle);
       if (d <= R) pb.set(x, OY + y, WELL);
       else if (d <= R + 1) pb.set(x, OY + y, ramp.d);
+      else continue;
+      mark?.add((OY + y) * BW + x);
     }
 }
 
@@ -225,23 +296,28 @@ function decalLayer(cfg: CarConfig, F: HalfDef, R: HalfDef): PB {
       }
       break;
     case 'numero': {
-      const cx = OX - 1, cy = OY - 8;
-      pb.disc(cx, cy, 4, '#f8f8f8');
-      const glyph = ['###', '..#', '.#.', '.#.', '.#.'];
-      glyph.forEach((row, j) =>
-        [...row].forEach((ch, i) => ch === '#' && pb.set(cx - 1 + i, cy - 2 + j, cfg.colors.decal === 'blanco' ? '#d02030' : ramp.d)),
+      const cx = OX + 8, cy = OY - 7;
+      pb.disc(cx, cy, 5.5, ramp.o === '#282838' ? '#202030' : ramp.d);
+      pb.disc(cx, cy, 4.6, '#f8f8f8');
+      const n = Math.max(0, Math.min(9, cfg.number ?? 7));
+      DIGITS[n].forEach((row, j) =>
+        [...row].forEach((ch, i) => ch === '#' && pb.set(cx - 2 + i, cy - 3 + j, cfg.colors.decal === 'blanco' ? '#d02030' : ramp.d)),
       );
       break;
     }
     case 'llamas': {
-      const cols = ['#e83020', '#ff8a20', '#ffe040'];
-      for (let d = 6; d < F.L; d++) {
-        const k = (d % 9) / 9;
-        const len = Math.round(2 + 3 * Math.sin(k * Math.PI));
-        for (let i = -len; i <= len; i++) {
-          const y = OY - 6 + i;
-          const t = Math.abs(i) / (len + 1);
-          pb.set(fx(d), y, cols[t > 0.66 ? 0 : t > 0.3 ? 1 : 2]);
+      // lenguas de fuego horizontales: nacen en la trompa y terminan en punta sobre la puerta
+      const cols = ['#a80c10', '#e82818', '#ff8a10', '#ffd820', '#fff6b0'];
+      const P = 3.4;
+      for (let d = -2; d < F.L + 2; d++) {
+        const dist = F.L - d;
+        for (let y = -13; y <= -2; y++) {
+          const ph = ((((y + 13 + dist * 0.06) / P) % 1) + 1) % 1;
+          const tri = 1 - Math.abs(2 * ph - 1);
+          const len = 16 + 32 * Math.pow(tri, 1.25);
+          if (dist >= len) continue;
+          const k = dist / len;
+          pb.set(fx(d), OY + y, cols[k > 0.86 ? 0 : k > 0.66 ? 1 : k > 0.4 ? 2 : k > 0.16 ? 3 : 4]);
         }
       }
       break;
@@ -269,14 +345,46 @@ function decalLayer(cfg: CarConfig, F: HalfDef, R: HalfDef): PB {
   return pb;
 }
 
-function applyMask(target: PB, decal: PB) {
+const DIGITS = [
+  ['.###.', '#...#', '#..##', '#.#.#', '##..#', '#...#', '.###.'],
+  ['..#..', '.##..', '..#..', '..#..', '..#..', '..#..', '.###.'],
+  ['.###.', '#...#', '....#', '...#.', '..#..', '.#...', '#####'],
+  ['####.', '....#', '....#', '.###.', '....#', '....#', '####.'],
+  ['...#.', '..##.', '.#.#.', '#..#.', '#####', '...#.', '...#.'],
+  ['#####', '#....', '####.', '....#', '....#', '#...#', '.###.'],
+  ['.###.', '#....', '#....', '####.', '#...#', '#...#', '.###.'],
+  ['#####', '....#', '...#.', '..#..', '..#..', '..#..', '..#..'],
+  ['.###.', '#...#', '#...#', '.###.', '#...#', '#...#', '.###.'],
+  ['.###.', '#...#', '#...#', '.####', '....#', '....#', '.###.'],
+];
+
+function applyMask(target: PB, decal: PB, skip: Set<number>) {
   for (let i = 0; i < target.d.length; i++) {
+    if (skip.has(i)) continue;
     if ((target.d[i] >>> 24) > 0 && (decal.d[i] >>> 24) > 0) target.d[i] = decal.d[i];
   }
 }
 
 function drawCabin(def: CabinDef, ramp: Ramp): PB {
   const pb = new PB(BW, BH);
+  if (def.special === 'casco') {
+    for (let x = def.x0; x <= def.x1; x++) shadeColumn(pb, OX + x, -17, DECK, ramp, false);
+    // arco de seguridad
+    pb.rect(OX - 8, OY - 27, 2, 10, METAL.d);
+    pb.rect(OX - 8, OY - 27, 1, 10, METAL.l);
+    // piloto con casco
+    pb.rect(OX - 3, OY - 21, 7, 4, '#202030');
+    pb.disc(OX + def.headX, OY - 24, 3.6, ramp.b);
+    pb.disc(OX + def.headX - 1, OY - 25, 1.6, ramp.l);
+    pb.rect(OX + def.headX + 1, OY - 25, 3, 2, '#1a2838');
+    pb.set(OX + def.headX + 2, OY - 25, '#80c8f0');
+    pb.rect(OX + def.headX - 3, OY - 22, 7, 1, '#ffffff');
+    // volante y parabrisas chico
+    pb.line(OX + 6, OY - 21, OX + 8, OY - 18, '#202028');
+    pb.poly([[OX + 11, OY - 21], [OX + 12, OY - 21], [OX + 15, OY - 17], [OX + 13, OY - 17]], GLASS.l);
+    pb.outline(ramp.o);
+    return pb;
+  }
   if (def.special === 'convertible') {
     for (let x = def.x0; x <= def.x1; x++) shadeColumn(pb, OX + x, -17, DECK, ramp, false);
     // asiento
@@ -308,7 +416,8 @@ function drawCabin(def: CabinDef, ramp: Ramp): PB {
   const wb = -18;
   for (const [xa, xb] of def.windows) {
     for (let x = xa; x <= xb; x++) {
-      const wt = Math.max(cabinTop(def, x - 2), cabinTop(def, x), cabinTop(def, x + 2)) + 2;
+      const wt = def.thinFrame ? cabinTop(def, x) + 1 : Math.max(cabinTop(def, x - 2), cabinTop(def, x), cabinTop(def, x + 2)) + 2;
+      if (wt > wb) continue;
       for (let y = wt; y <= wb; y++) {
         let c = GLASS.b;
         if (y === wt) c = GLASS.d;
@@ -365,6 +474,40 @@ function drawHeadlight(pb: PB, style: string, x: number, y: number, ramp: Ramp) 
       pb.poly([[x - 5, y + 2], [x + 0, y - 2], [x + 4, y - 2], [x - 1, y + 2]], METAL.o);
       pb.poly([[x - 3, y + 1], [x + 0, y - 1], [x + 2, y - 1], [x - 1, y + 1]], lens);
       break;
+    case 'enojados':
+      pb.disc(x, y - 1, 3, '#202028');
+      pb.disc(x, y - 1, 2.2, '#ffffff');
+      pb.rect(x + 1, y - 1, 2, 2, '#101018');
+      pb.set(x + 1, y - 1, '#ffffff');
+      pb.line(x - 3, y - 5, x + 3, y - 3, '#101018');
+      pb.line(x - 3, y - 4, x + 3, y - 2, '#101018');
+      pb.line(x - 3, y - 6, x + 3, y - 4, ramp.d);
+      break;
+    case 'estrella': {
+      const tmp = new PB(BW, BH);
+      const pts: [number, number][] = [];
+      for (let k = 0; k < 10; k++) {
+        const a = -Math.PI / 2 + (k * Math.PI) / 5;
+        const rad = k % 2 === 0 ? 4 : 1.8;
+        pts.push([x + 0.5 + Math.cos(a) * rad, y + 0.5 + Math.sin(a) * rad]);
+      }
+      tmp.poly(pts, '#f8d020');
+      tmp.set(x, y, '#ffffff');
+      tmp.set(x, y - 1, '#fff8c0');
+      tmp.outline('#3a2a06');
+      pb.blit(tmp);
+      break;
+    }
+    case 'corazon': {
+      const H = ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'];
+      const tmp = new PB(BW, BH);
+      H.forEach((row, j) => [...row].forEach((ch, i) => ch === '#' && tmp.set(x - 3 + i, y - 3 + j, '#f03060')));
+      tmp.set(x - 2, y - 2, '#ffb0c0');
+      tmp.set(x - 1, y - 2, '#ff7090');
+      tmp.outline('#3a0a18');
+      pb.blit(tmp);
+      break;
+    }
     default:
       pb.disc(x, y, 2, METAL.o);
       pb.disc(x, y, 1, lens);
@@ -464,6 +607,16 @@ function drawExtras(pb: PB, cfg: CarConfig, F: HalfDef, R: HalfDef, acc: Ramp) {
   }
 }
 
+/**
+ * Posición de la rueda delantera: se corre hacia atrás según su tamaño para
+ * que siempre se vea la trompa (al menos 5 px) y el faro delantero.
+ */
+function frontWheelX(F: HalfDef, r: number) {
+  let maxFront = F.L - 5;
+  if (F.light.y > -12) maxFront = Math.min(maxFront, F.light.d - 4);
+  return Math.max(20, Math.min(F.wheel, maxFront - r));
+}
+
 export function buildCar(cfg: CarConfig): BuiltCar {
   const F = findById(FRONTS, cfg.front);
   const R = findById(REARS, cfg.rear);
@@ -474,16 +627,18 @@ export function buildCar(cfg: CarConfig): BuiltCar {
 
   const front = drawHalf(F, rf, 1);
   const rear = drawHalf(R, rr, -1);
+  const fWheel = frontWheelX(F, W.r);
+  const fwx = OX + fWheel, rwx = OX - 1 - R.wheel;
+  const wells = new Set<number>();
+  cutWell(front, fwx, W.r, rf, wells);
+  cutWell(rear, rwx, W.r, rr, wells);
+  cutWell(front, rwx, W.r, rf, wells);
+  cutWell(rear, fwx, W.r, rr, wells);
   if (cfg.decal !== 'nada') {
     const dec = decalLayer(cfg, F, R);
-    applyMask(front, dec);
-    applyMask(rear, dec);
+    applyMask(front, dec, wells);
+    applyMask(rear, dec, wells);
   }
-  const fwx = OX + F.wheel, rwx = OX - 1 - R.wheel;
-  cutWell(front, fwx, W.r, rf);
-  cutWell(rear, rwx, W.r, rr);
-  cutWell(front, rwx, W.r, rf);
-  cutWell(rear, fwx, W.r, rr);
   front.outline(rf.o);
   rear.outline(rr.o);
 
@@ -505,7 +660,7 @@ export function buildCar(cfg: CarConfig): BuiltCar {
 
   // techo
   let roofY = 0, rx0 = 0, rx1 = 0;
-  if (CB.special !== 'convertible') {
+  if (!CB.special) {
     roofY = 0;
     for (let x = CB.x0; x <= CB.x1; x++) roofY = Math.min(roofY, cabinTop(CB, x));
     rx0 = 999; rx1 = -999;
@@ -532,7 +687,7 @@ export function buildCar(cfg: CarConfig): BuiltCar {
     ground: 2 * W.r - 8,
     wheels: [
       { x: -1 - R.wheel, r: W.r, frames },
-      { x: F.wheel, r: W.r, frames },
+      { x: fWheel, r: W.r, frames },
     ],
     light: { x: F.light.d + 2, y: F.light.y, style: cfg.lights },
     tail: { x: -1 - R.light.d - 1, y: R.light.y },

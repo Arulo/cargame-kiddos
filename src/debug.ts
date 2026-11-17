@@ -35,6 +35,7 @@ if (q.get('drive')) {
   s.D = Number(q.get('d') ?? 0);
   (s as any).nextAt = Number(q.get('next') ?? 380);
   if (q.get('ev')) (s as any).bag = [q.get('ev')];
+  if (q.get('kind')) setInterval(() => { const e = (s as any).ev; if (e && !e._k) { e.kind = q.get('kind'); e._k = 1; } }, 20);
   s.gas = true;
   s.start();
   (window as any).scene = s;

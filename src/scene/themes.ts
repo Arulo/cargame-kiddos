@@ -261,7 +261,7 @@ function lampGlow(pb: PB, x: number, base: number, h: number, bottom: number) {
 // carretera
 
 interface RoadOpts {
-  verge: 'walk' | 'boards' | 'grass' | 'sand';
+  verge: 'walk' | 'boards' | 'grass' | 'sand' | 'candy';
   asphalt: string;
   asphaltD: string;
   asphaltL: string;
@@ -288,6 +288,11 @@ function roadBase(H: number, r: R, o: RoadOpts) {
         case 'grass':
           c = y === walkTop ? '#78d058' : (x * 7 + y * 3) % 13 === 0 ? '#3a9030' : '#58b040';
           break;
+        case 'candy': {
+          const sprinkle = (x * 7 + y * 13) % 23 === 0 ? ['#ffffff', '#58c8f0', '#f8d020', '#78d860'][(x + y) % 4] : null;
+          c = y === walkTop ? '#ffd8ec' : y === walkTop + 1 ? '#ffc0e0' : sprinkle ?? '#f8a8d0';
+          break;
+        }
         case 'sand':
           c = y === walkTop ? '#f8d8a0' : (x * 5 + y * 7) % 11 === 0 ? '#d0a060' : '#e8c080';
           break;
@@ -581,11 +586,144 @@ function desert(H: number): ThemeArt {
   };
 }
 
+function swirl(pb: PB, cx: number, cy: number, r: number, a: string, b: string) {
+  pb.disc(cx, cy, r, b);
+  for (let arm = 0; arm < 2; arm++)
+    for (let t = 0; t <= 1; t += 0.01) {
+      const ang = arm * Math.PI + t * Math.PI * 4;
+      const rad = t * r;
+      pb.set(cx + Math.cos(ang) * rad, cy + Math.sin(ang) * rad, a);
+      pb.set(cx + Math.cos(ang) * rad, cy + Math.sin(ang) * rad + 1, a);
+    }
+  pb.set(cx - r * 0.4, cy - r * 0.5, '#ffffff');
+}
+
+function candyCane(pb: PB, x: number, base: number, h: number) {
+  for (let i = 0; i < h; i++) pb.rect(x, base - i, 3, 1, Math.floor(i / 3) % 2 ? '#ffffff' : '#e82838');
+  const cx = x + 5, cy = base - h;
+  for (let a = Math.PI; a <= Math.PI * 2; a += 0.08) {
+    const k = Math.floor(((a - Math.PI) / Math.PI) * 6) % 2;
+    for (let w = 0; w < 3; w++) pb.set(cx + Math.cos(a) * (4 + w), cy + Math.sin(a) * (4 + w), k ? '#ffffff' : '#e82838');
+  }
+}
+
+function gumdrop(pb: PB, x: number, base: number, r: number, c: string, hl: string) {
+  for (let dy = 0; dy <= r * 1.3; dy++) {
+    const w = Math.round(r * Math.sqrt(Math.max(0, 1 - (dy / (r * 1.3)) ** 2)));
+    pb.rect(x - w, base - dy, w * 2 + 1, 1, c);
+  }
+  pb.rect(x - Math.round(r * 0.4), base - Math.round(r * 0.9), 2, 2, hl);
+  for (let i = 0; i < 4; i++) pb.set(x - r + 2 + i * Math.round(r / 2), base - 2 - (i % 2) * 3, '#ffffff');
+}
+
+function candy(H: number): ThemeArt {
+  const r = rng(21);
+  const { walkTop } = geom(H);
+  const sky = new PB(TW, H);
+  skyGrad(sky, ['#f490d0', '#f8a8dc', '#fabce4', '#fcd0ee', '#fee6f6'], walkTop);
+  // arcoíris
+  const rc = ['#ff5a5a', '#ffa040', '#ffe050', '#70d860', '#58b0f8', '#a070f0'];
+  const cx = 300, cy = walkTop + 6, R0 = Math.min(110, walkTop - 10);
+  for (let y = 0; y < cy; y++)
+    for (let x = cx - R0 - 2; x <= cx + R0 + 2; x++) {
+      const d = Math.hypot(x - cx, y - cy);
+      const band = Math.floor((R0 - d) / 3);
+      if (band >= 0 && band < rc.length) sky.set(x, y, rc[band]);
+    }
+  sun(sky, 90, 30, 9, '#fff6c0', '#ffd8f0');
+  stars(sky, r, walkTop - 60, 25);
+
+  // montañas de helado
+  const far = new PB(TW, H);
+  const flav = [
+    { b: '#a8e8d0', d: '#78c8b0' },
+    { b: '#f8a0b8', d: '#e07898' },
+    { b: '#f8ecc8', d: '#e0c898' },
+    { b: '#c8a8f0', d: '#a080d8' },
+    { b: '#9a6040', d: '#7a4428' },
+  ];
+  for (let i = 0; i < 6; i++) {
+    const mx = Math.round((i + 0.3) * (TW / 6));
+    const h = r.int(40, Math.min(80, walkTop - 30));
+    const w = Math.round(h * 0.9);
+    const f = flav[i % flav.length];
+    const seed = r.int(0, 1e6);
+    wrap((xx) => {
+      const rr = rng(seed);
+      for (let x = -w; x <= w; x++) {
+        const k = Math.abs(x) / w;
+        const top = Math.round(walkTop - h * (1 - k * k) - 2);
+        for (let y = top; y < walkTop + 2; y++) far.set(xx + x, y, x > w * 0.3 ? f.d : f.b);
+        // glaseado con gotas
+        const drip = Math.round(4 + Math.max(0, Math.sin(x * 0.7 + seed) * 4));
+        if (k < 0.75) for (let y = top; y < top + drip; y++) far.set(xx + x, y, '#ffffff');
+      }
+      for (let i2 = 0; i2 < 18; i2++) {
+        const sx = rr.int(-w * 0.6, w * 0.6);
+        const sy = walkTop - Math.round(h * (1 - (sx / w) ** 2)) + rr.int(1, 5);
+        far.rect(xx + sx, sy, 2, 1, rr.pick(['#ff5a8a', '#58b0f8', '#ffe050', '#70d860']));
+      }
+    })(mx);
+  }
+
+  // chupetines, bastones y gomitas
+  const mid = new PB(TW, H);
+  const popCols: [string, string][] = [['#ff5a8a', '#ffffff'], ['#58b0f8', '#ffffff'], ['#ffb030', '#fff0a0'], ['#a070f0', '#f0d8ff']];
+  for (let i = 0; i < 5; i++) {
+    const px = Math.round((i + 0.5) * (TW / 5)) + r.int(-10, 10);
+    const h = r.int(34, Math.min(60, walkTop - 40));
+    const [a, b] = popCols[i % popCols.length];
+    const rad = r.int(9, 13);
+    wrap((xx) => {
+      mid.rect(xx - 1, walkTop - h, 3, h + 2, '#fff8f0');
+      mid.rect(xx + 1, walkTop - h, 1, h + 2, '#e8d8d0');
+      swirl(mid, xx, walkTop - h - rad + 2, rad, a, b);
+    })(px);
+  }
+  for (const cx2 of [48, 230, 400]) wrap((xx) => candyCane(mid, xx, walkTop + 1, r.int(26, 36)))(cx2);
+  const gums: [string, string][] = [['#70d860', '#c0ffb0'], ['#ff5a5a', '#ffc0c0'], ['#ffe050', '#fff8c0'], ['#58b0f8', '#c8e8ff']];
+  for (let i = 0; i < 9; i++) {
+    const [c, hl] = r.pick(gums);
+    const gx = r.int(0, TW - 1), gr = r.int(5, 9);
+    wrap((xx) => gumdrop(mid, xx, walkTop + 1, gr, c, hl))(gx);
+  }
+  mid.outline('#5a2048', true);
+
+  const road = roadBase(H, r, { verge: 'candy', asphalt: '#6a3a28', asphaltD: '#4a2818', asphaltL: '#7e4c36', line: '#fff0f8' });
+  // cupcakes y caramelos en la vereda
+  for (const cx3 of [70, 250, 420])
+    wrap((xx) => {
+      road.poly([[xx - 6, walkTop + 6], [xx + 6, walkTop + 6], [xx + 5, walkTop - 1], [xx - 5, walkTop - 1]], '#f8c060');
+      for (let k = -4; k <= 4; k += 2) road.rect(xx + k, walkTop, 1, 6, '#d89838');
+      road.disc(xx, walkTop - 4, 5, '#ffd0e8');
+      road.disc(xx - 1, walkTop - 6, 3, '#fff0f8');
+      road.disc(xx, walkTop - 10, 1.4, '#e82838');
+    })(cx3);
+  for (const cx4 of [160, 330])
+    wrap((xx) => {
+      road.rect(xx - 4, walkTop - 2, 9, 5, '#58b0f8');
+      road.rect(xx - 4, walkTop - 2, 9, 1, '#a8d8ff');
+      road.poly([[xx - 4, walkTop], [xx - 8, walkTop - 3], [xx - 8, walkTop + 4]], '#58b0f8');
+      road.poly([[xx + 4, walkTop], [xx + 8, walkTop - 3], [xx + 8, walkTop + 4]], '#58b0f8');
+    })(cx4);
+  road.outline('#5a2048', true);
+  return {
+    layers: [
+      { cv: sky.canvas(), f: 0.02 },
+      { cv: cloudsLayer(H, r, 6, { b: '#fff4fa', s: '#f8c8e0', o: '#e8a0c8' }), f: 0.06, drift: 4 },
+      { cv: far.canvas(), f: 0.13 },
+      { cv: mid.canvas(), f: 0.42 },
+      { cv: road.canvas(), f: 1 },
+    ],
+  };
+}
+
 export const THEMES: Theme[] = [
   { id: 'ciudad', name: 'Ciudad', emoji: '🏙️', night: false, ground: '#6a6a78', build: city(false) },
   { id: 'playa', name: 'Playa', emoji: '🏖️', night: false, ground: '#c8a068', build: beach },
   { id: 'bosque', name: 'Bosque', emoji: '🌲', night: false, ground: '#4a8040', build: forest },
   { id: 'desierto', name: 'Desierto', emoji: '🌵', night: false, ground: '#c88050', build: desert },
+  { id: 'golosinas', name: 'Golosinas', emoji: '🍭', night: false, ground: '#f8a8d0', build: candy },
   { id: 'noche', name: 'Ciudad de noche', emoji: '🌙', night: true, ground: '#3a3a50', build: city(true) },
 ];
 

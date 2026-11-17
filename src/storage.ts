@@ -69,6 +69,7 @@ export function randomCar(): CarConfig {
     roof: pick(ROOFS).id,
     extras,
     decal: pick(DECALS).id,
+    number: Math.floor(Math.random() * 10),
     colors: {
       front: body,
       rear: body,

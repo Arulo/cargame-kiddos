@@ -71,6 +71,8 @@ export const sfx = {
   star: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.14, 'square', 0.09, undefined, i * 0.07)),
   fanfare: () => [392, 523, 659, 784, 659, 784].forEach((f, i) => tone(f, i === 5 ? 0.35 : 0.12, 'square', 0.08, undefined, i * 0.1)),
   quack: () => { tone(620, 0.09, 'sawtooth', 0.08, 380); tone(600, 0.09, 'sawtooth', 0.08, 360, 0.14); },
+  moo: () => { tone(200, 0.7, 'sawtooth', 0.1, 120); tone(100, 0.7, 'square', 0.04, 70); },
+  oink: () => { [0, 0.18].forEach((d) => { tone(330, 0.1, 'square', 0.08, 220, d); noise(0.08, 0.05, 900, d); }); },
   lightsOn: () => tone(1200, 0.04, 'square', 0.06),
   lightsOff: () => tone(700, 0.04, 'square', 0.06),
   whoosh: () => noise(0.3, 0.06, 900),

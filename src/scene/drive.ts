@@ -3,7 +3,7 @@ import { fitPixelCanvas } from '../gfx/pixel';
 import { BuiltCar, buildCar, drawCar } from '../car/build';
 import { CarConfig } from '../car/parts';
 import { Theme, ThemeArt, themeById, geom, TW } from './themes';
-import { trafficLight, ducks, cone, turtleSign, Sprite } from './props';
+import { trafficLight, animals, AnimalKind, cone, turtleSign, Sprite } from './props';
 import { Engine, Horn, sfx } from '../audio';
 
 export type Hint = 'horn' | 'lights' | 'gas' | 'brake' | null;
@@ -21,6 +21,12 @@ export interface DriveCallbacks {
 }
 
 const TARGET_H = 200;
+
+const ANIMAL_TEXT: Record<AnimalKind, { emoji: string; seen: string; sound_text: string; done: string; sound: () => void }> = {
+  patos: { emoji: '🦆', seen: '¡Patitos en el camino!', sound_text: '¡Cuac, cuac!', done: '¡Los patitos se fueron volando!', sound: () => sfx.quack() },
+  vacas: { emoji: '🐄', seen: '¡Vacas en el camino!', sound_text: '¡Muuuu!', done: '¡Las vacas se apartaron!', sound: () => sfx.moo() },
+  cerdos: { emoji: '🐷', seen: '¡Cerditos en el camino!', sound_text: '¡Oink, oink!', done: '¡Los cerditos se fueron corriendo!', sound: () => sfx.oink() },
+};
 const VMAX = 210;
 const ACC = 115;
 const BRAKE = 330;
@@ -38,6 +44,7 @@ interface Ev {
   gasTime: number;
   starGiven: boolean;
   fx: number;
+  kind: AnimalKind;
   fy: number;
 }
 
@@ -75,6 +82,8 @@ export class DriveScene {
   private ev: Ev | null = null;
   private nextAt = 380;
   private bag: EvType[] = [];
+  private animalBag: AnimalKind[] = [];
+  private lastAnimal: AnimalKind | null = null;
   private particles: Particle[] = [];
   private lines: { x: number; y: number; w: number }[] = [];
   private raf = 0;
@@ -175,6 +184,22 @@ export class DriveScene {
     this.prompt({ emoji: '⭐', text: msg, good: true }, 2.4);
   }
 
+  /** Saca los tres animales sin repetir hasta que salieron todos. */
+  private nextAnimal(): AnimalKind {
+    if (!this.animalBag.length) {
+      const b: AnimalKind[] = ['patos', 'vacas', 'cerdos'];
+      for (let i = b.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [b[i], b[j]] = [b[j], b[i]];
+      }
+      // que no se repita el último de la bolsa anterior
+      if (b[b.length - 1] === this.lastAnimal) [b[0], b[b.length - 1]] = [b[b.length - 1], b[0]];
+      this.animalBag = b;
+    }
+    this.lastAnimal = this.animalBag.pop()!;
+    return this.lastAnimal;
+  }
+
   private nextType(): EvType {
     if (!this.bag.length) {
       this.bag = ['semaforo', 'patos', 'tunel', 'lento'];
@@ -243,12 +268,13 @@ export class DriveScene {
         break;
       }
       case 'patos': {
-        const sa = ev.E - 33 - car.frontExt - 8;
+        const T = ANIMAL_TEXT[ev.kind];
+        const sa = ev.E - animals(ev.kind, 0, false).ax - car.frontExt - 8;
         if (ev.state === 'approach' || ev.state === 'honk') {
           stopAt = sa;
           if (visible && !ev.prompted) {
             ev.prompted = true;
-            this.prompt({ emoji: '🦆', text: '¡Patitos en el camino!' });
+            this.prompt({ emoji: T.emoji, text: T.seen });
           }
           if (ev.state === 'approach' && this.D >= sa - 0.8 && stopped) {
             ev.state = 'honk';
@@ -257,15 +283,21 @@ export class DriveScene {
           if (this.honkEdge && visible) {
             ev.state = 'fly';
             ev.timer = 1.6;
-            sfx.quack();
-            this.prompt({ emoji: '🦆', text: '¡Cuac, cuac!' });
+            T.sound();
+            this.prompt({ emoji: T.emoji, text: T.sound_text });
           }
         } else if (ev.state === 'fly') {
           ev.timer -= dt;
-          ev.fx += dt * 40;
-          ev.fy -= dt * 60;
+          if (ev.kind === 'patos') {
+            ev.fx += dt * 40;
+            ev.fy -= dt * 60;
+          } else {
+            // corren hacia la vereda de enfrente
+            ev.fx += dt * 55;
+            ev.fy = Math.max(-26, ev.fy - dt * 30);
+          }
           if (ev.timer > 1.1) stopAt = sa;
-          if (ev.timer <= 0) this.finish('¡Los patitos se fueron volando!');
+          if (ev.timer <= 0) this.finish(T.done);
         }
         break;
       }
@@ -331,6 +363,7 @@ export class DriveScene {
       this.ev = {
         type, E: this.D + this.W - this.carX + 70, state: 'approach', timer: 0, violated: false,
         len: type === 'tunel' ? 560 : type === 'lento' ? 460 : 0, prompted: false, gasTime: 0, starGiven: false, fx: 0, fy: 0,
+        kind: type === 'patos' ? this.nextAnimal() : 'patos',
       };
     }
     const { stopAt, cap } = this.updateEvent(dt);
@@ -383,12 +416,13 @@ export class DriveScene {
 
     // partículas
     const { groundY } = geom(this.H);
-    const dusty = ['desierto', 'playa', 'bosque'].includes(this.theme.id);
+    const dusty = ['desierto', 'playa', 'bosque', 'golosinas'].includes(this.theme.id);
     if (dusty && this.v > 70 && Math.random() < dt * (this.v / 25)) {
       const rw = car.wheels[0];
       this.particles.push({
         x: this.D + rw.x - rw.r, y: groundY - 2, vx: -15 - Math.random() * 15, vy: -8 - Math.random() * 12,
-        life: 0, max: 0.6, size: 2, color: this.theme.id === 'bosque' ? '#a08060' : '#e8c890',
+        life: 0, max: 0.6, size: 2,
+        color: this.theme.id === 'golosinas' ? ['#ff5a8a', '#58b0f8', '#ffe050', '#70d860', '#ffffff'][Math.floor(Math.random() * 5)] : this.theme.id === 'bosque' ? '#a08060' : '#e8c890',
       });
     }
     if (car.exhaust && Math.random() < dt * (this.gas ? 14 : 3)) {
@@ -448,8 +482,11 @@ export class DriveScene {
         ctx.fillRect(ex - 1, roadTop + 2, 3, H - roadTop - 5);
       }
       if (ev.type === 'patos') {
-        const frame = ev.state === 'fly' ? 0 : Math.floor(this.t * 5) % 2;
-        this.drawSprite(ducks(frame, ev.state === 'fly'), ex + ev.fx, groundY + ev.fy);
+        const running = ev.state === 'fly';
+        const frame = running && ev.kind === 'patos' ? 0 : Math.floor(this.t * (running ? 12 : 4)) % 2;
+        if (running) ctx.globalAlpha = Math.max(0, Math.min(1, ev.timer / 0.6));
+        this.drawSprite(animals(ev.kind, frame, running && ev.kind === 'patos'), ex + ev.fx, groundY + ev.fy);
+        ctx.globalAlpha = 1;
       }
       if (ev.type === 'lento') {
         this.drawSprite(turtleSign(false), sx(ev.E - 8), walkTop + 4);
@@ -558,9 +595,9 @@ export class DriveScene {
     // frente del túnel y conos cercanos
     if (tunnel) {
       const { x0, x1, top } = tunnel;
-      const g = this.theme.id === 'desierto' ? '#c87850' : this.theme.id === 'playa' ? '#58a858' : this.theme.night ? '#1c3424' : '#48a048';
-      const rock = this.theme.id === 'desierto' ? '#a05838' : this.theme.night ? '#3a3448' : '#7a7088';
-      const rockD = this.theme.id === 'desierto' ? '#804028' : this.theme.night ? '#2a2438' : '#5a5068';
+      const g = this.theme.id === 'golosinas' ? '#ffffff' : this.theme.id === 'desierto' ? '#c87850' : this.theme.id === 'playa' ? '#58a858' : this.theme.night ? '#1c3424' : '#48a048';
+      const rock = this.theme.id === 'golosinas' ? '#8a5038' : this.theme.id === 'desierto' ? '#a05838' : this.theme.night ? '#3a3448' : '#7a7088';
+      const rockD = this.theme.id === 'golosinas' ? '#f8a0c8' : this.theme.id === 'desierto' ? '#804028' : this.theme.night ? '#2a2438' : '#5a5068';
       ctx.fillStyle = rock;
       const span = x1 - x0;
       for (let x = x0 - 18; x < x1 + 18; x++) {

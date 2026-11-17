@@ -110,3 +110,91 @@ export function turtleSign(end: boolean): Sprite {
     return toSprite(pb, 9, 39);
   });
 }
+
+// ---------------------------------------------------------------------------
+// Vacas y cerditos (vista lateral, mirando a la derecha)
+
+function cow(pb: PB, x: number, base: number, frame: number, small: boolean) {
+  const s = small ? 0.7 : 1;
+  const bw = Math.round(22 * s), bh = Math.round(10 * s), leg = Math.round(6 * s);
+  const top = base - leg - bh;
+  const white = '#f8f8f0', shade = '#c8c8c8', black = '#202028', pink = '#f0a0a8';
+  // patas (alternan al caminar)
+  const lx = [x + 1, x + 4, x + bw - 6, x + bw - 3];
+  lx.forEach((px, i) => {
+    const up = (i + frame) % 2 === 0 ? 1 : 0;
+    pb.rect(px, base - leg - up, 2, leg, white);
+    pb.rect(px, base - 2 - up, 2, 2, black);
+  });
+  // cuerpo
+  pb.rect(x, top + 1, bw, bh - 1, white);
+  pb.rect(x + 1, top, bw - 2, 1, white);
+  pb.rect(x, top + bh - 2, bw, 2, shade);
+  // manchas
+  pb.disc(x + Math.round(5 * s), top + Math.round(4 * s), 2.2 * s, black);
+  pb.disc(x + Math.round(14 * s), top + Math.round(3 * s), 2.6 * s, black);
+  pb.disc(x + Math.round(10 * s), top + Math.round(7 * s), 1.6 * s, black);
+  // ubre
+  if (!small) pb.rect(x + bw - 9, top + bh, 4, 2, pink);
+  // cola
+  pb.line(x - 1, top + 1, x - 2, top + 6, black);
+  pb.rect(x - 3, top + 6, 2, 2, black);
+  // cabeza
+  const hx = x + bw - 2, hy = top - Math.round(3 * s);
+  const hw = Math.round(8 * s), hh = Math.round(8 * s);
+  pb.rect(hx, hy, hw, hh, white);
+  pb.rect(hx + hw - 3, hy + hh - 3, 4, 4, pink);
+  pb.set(hx + hw, hy + hh - 2, '#c06070');
+  pb.set(hx + hw - 3, hy + 2, black);
+  pb.rect(hx - 1, hy, 2, 2, black); // oreja
+  pb.set(hx + 1, hy - 1, '#e8d8b0'); // cuerno
+  pb.set(hx + 4, hy - 1, '#e8d8b0');
+  pb.set(hx + 4, hy - 2, '#e8d8b0');
+}
+
+function pig(pb: PB, x: number, base: number, frame: number, small: boolean) {
+  const s = small ? 0.65 : 1;
+  const bw = Math.round(16 * s), bh = Math.round(9 * s), leg = Math.round(3 * s) + 1;
+  const top = base - leg - bh;
+  const pk = '#f8a8b8', sh = '#d87890', hl = '#ffd0d8', dk = '#a04860';
+  [x + 2, x + bw - 4].forEach((px, i) => {
+    const up = (i + frame) % 2 === 0 ? 1 : 0;
+    pb.rect(px, base - leg - up, 2, leg, sh);
+    pb.rect(px + 1 + (i ? -1 : 0), base - leg, 2, leg - up, pk);
+  });
+  pb.rect(x + 1, top, bw - 2, bh, pk);
+  pb.rect(x, top + 1, bw, bh - 2, pk);
+  pb.rect(x + 2, top + 1, bw - 5, 1, hl);
+  pb.rect(x + 1, top + bh - 2, bw - 2, 1, sh);
+  // cola enrulada
+  pb.set(x - 1, top + 2, dk); pb.set(x - 2, top + 1, dk); pb.set(x - 2, top + 3, dk); pb.set(x - 3, top + 2, dk);
+  // cabeza + hocico
+  const hx = x + bw - 3, hy = top - 1;
+  const hs = Math.round(7 * s);
+  pb.rect(hx, hy, hs, hs, pk);
+  pb.rect(hx + hs, hy + Math.round(hs / 2) - 1, 2, 3, '#f07890');
+  pb.set(hx + hs + 1, hy + Math.round(hs / 2), dk);
+  pb.set(hx + hs - 2, hy + 2, '#202028');
+  pb.set(hx + 1, hy - 1, sh);
+  pb.set(hx + 2, hy - 2, sh);
+  pb.set(hx + 2, hy - 1, pk);
+}
+
+export type AnimalKind = 'patos' | 'vacas' | 'cerdos';
+
+export function animals(kind: AnimalKind, frame: number, run: boolean): Sprite {
+  if (kind === 'patos') return ducks(frame, run);
+  return memo(kind + frame + run, () => {
+    const pb = new PB(72, 34);
+    if (kind === 'vacas') {
+      cow(pb, 32, 33, frame, false);
+      cow(pb, 6, 33, frame + 1, true);
+    } else {
+      pig(pb, 44, 33, frame, false);
+      pig(pb, 26, 33, frame + 1, true);
+      pig(pb, 9, 33, frame, true);
+    }
+    pb.outline('#202028');
+    return toSprite(pb, 36, 33);
+  });
+}

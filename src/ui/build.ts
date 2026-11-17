@@ -262,6 +262,7 @@ export const mountBuild: Mount = (root, _params, nav) => {
       else if (!has) cfg.extras = [...cfg.extras, id];
     } else {
       (cfg as unknown as Record<string, string>)[t.id] = id;
+      if (t.id === 'decal' && id === 'numero') cfg.number = Math.floor(Math.random() * 10);
     }
     car = buildCar(cfg);
     makeBg();
